@@ -1,7 +1,9 @@
 """
 @author: Viet Nguyen <nhviet1009@gmail.com>
 """
+
 import argparse
+
 import torch
 
 from src.deep_q_network import DeepQNetwork
@@ -10,8 +12,7 @@ from src.utils import pre_processing
 
 
 def get_args():
-    parser = argparse.ArgumentParser(
-        """Implementation of Deep Q Network to play Flappy Bird""")
+    parser = argparse.ArgumentParser("""Implementation of Deep Q Network to play Flappy Bird""")
     parser.add_argument("--image_size", type=int, default=84, help="The common width and height for all images")
     parser.add_argument("--saved_path", type=str, default="trained_models")
 
@@ -25,13 +26,17 @@ def test(opt):
     else:
         torch.manual_seed(123)
     if torch.cuda.is_available():
-        model = torch.load("{}/flappy_bird".format(opt.saved_path))
+        model = torch.load("{}/flappy_bird_2000000".format(opt.saved_path), weights_only=False)
     else:
-        model = torch.load("{}/flappy_bird".format(opt.saved_path), map_location=lambda storage, loc: storage)
+        model = torch.load(
+            "{}/flappy_bird_2000000".format(opt.saved_path),
+            map_location=lambda storage, loc: storage,
+            weights_only=False,
+        )
     model.eval()
     game_state = FlappyBird()
     image, reward, terminal = game_state.next_frame(0)
-    image = pre_processing(image[:game_state.screen_width, :int(game_state.base_y)], opt.image_size, opt.image_size)
+    image = pre_processing(image[: game_state.screen_width, : int(game_state.base_y)], opt.image_size, opt.image_size)
     image = torch.from_numpy(image)
     if torch.cuda.is_available():
         model.cuda()
@@ -40,11 +45,12 @@ def test(opt):
 
     while True:
         prediction = model(state)[0]
-        action = torch.argmax(prediction)[0]
+        action = torch.argmax(prediction).item()
 
         next_image, reward, terminal = game_state.next_frame(action)
-        next_image = pre_processing(next_image[:game_state.screen_width, :int(game_state.base_y)], opt.image_size,
-                                    opt.image_size)
+        next_image = pre_processing(
+            next_image[: game_state.screen_width, : int(game_state.base_y)], opt.image_size, opt.image_size
+        )
         next_image = torch.from_numpy(next_image)
         if torch.cuda.is_available():
             next_image = next_image.cuda()

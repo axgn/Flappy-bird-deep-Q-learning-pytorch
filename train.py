@@ -1,10 +1,11 @@
 """
 @author: Viet Nguyen <nhviet1009@gmail.com>
 """
+
 import argparse
 import os
 import shutil
-from random import random, randint, sample
+from random import randint, random, sample
 
 import numpy as np
 import torch
@@ -17,8 +18,7 @@ from src.utils import pre_processing
 
 
 def get_args():
-    parser = argparse.ArgumentParser(
-        """Implementation of Deep Q Network to play Flappy Bird""")
+    parser = argparse.ArgumentParser("""Implementation of Deep Q Network to play Flappy Bird""")
     parser.add_argument("--image_size", type=int, default=84, help="The common width and height for all images")
     parser.add_argument("--batch_size", type=int, default=32, help="The number of images per batch")
     parser.add_argument("--optimizer", type=str, choices=["sgd", "adam"], default="adam")
@@ -27,8 +27,9 @@ def get_args():
     parser.add_argument("--initial_epsilon", type=float, default=0.1)
     parser.add_argument("--final_epsilon", type=float, default=1e-4)
     parser.add_argument("--num_iters", type=int, default=2000000)
-    parser.add_argument("--replay_memory_size", type=int, default=50000,
-                        help="Number of epoches between testing phases")
+    parser.add_argument(
+        "--replay_memory_size", type=int, default=50000, help="Number of epoches between testing phases"
+    )
     parser.add_argument("--log_path", type=str, default="tensorboard")
     parser.add_argument("--saved_path", type=str, default="trained_models")
 
@@ -50,7 +51,7 @@ def train(opt):
     criterion = nn.MSELoss()
     game_state = FlappyBird()
     image, reward, terminal = game_state.next_frame(0)
-    image = pre_processing(image[:game_state.screen_width, :int(game_state.base_y)], opt.image_size, opt.image_size)
+    image = pre_processing(image[: game_state.screen_width, : int(game_state.base_y)], opt.image_size, opt.image_size)
     image = torch.from_numpy(image)
     if torch.cuda.is_available():
         model.cuda()
@@ -63,19 +64,20 @@ def train(opt):
         prediction = model(state)[0]
         # Exploration or exploitation
         epsilon = opt.final_epsilon + (
-                (opt.num_iters - iter) * (opt.initial_epsilon - opt.final_epsilon) / opt.num_iters)
+            (opt.num_iters - iter) * (opt.initial_epsilon - opt.final_epsilon) / opt.num_iters
+        )
         u = random()
         random_action = u <= epsilon
         if random_action:
             print("Perform a random action")
             action = randint(0, 1)
         else:
-
-            action = torch.argmax(prediction)[0]
+            action = torch.argmax(prediction).item()
 
         next_image, reward, terminal = game_state.next_frame(action)
-        next_image = pre_processing(next_image[:game_state.screen_width, :int(game_state.base_y)], opt.image_size,
-                                    opt.image_size)
+        next_image = pre_processing(
+            next_image[: game_state.screen_width, : int(game_state.base_y)], opt.image_size, opt.image_size
+        )
         next_image = torch.from_numpy(next_image)
         if torch.cuda.is_available():
             next_image = next_image.cuda()
@@ -88,7 +90,8 @@ def train(opt):
 
         state_batch = torch.cat(tuple(state for state in state_batch))
         action_batch = torch.from_numpy(
-            np.array([[1, 0] if action == 0 else [0, 1] for action in action_batch], dtype=np.float32))
+            np.array([[1, 0] if action == 0 else [0, 1] for action in action_batch], dtype=np.float32)
+        )
         reward_batch = torch.from_numpy(np.array(reward_batch, dtype=np.float32)[:, None])
         next_state_batch = torch.cat(tuple(state for state in next_state_batch))
 
@@ -101,8 +104,11 @@ def train(opt):
         next_prediction_batch = model(next_state_batch)
 
         y_batch = torch.cat(
-            tuple(reward if terminal else reward + opt.gamma * torch.max(prediction) for reward, terminal, prediction in
-                  zip(reward_batch, terminal_batch, next_prediction_batch)))
+            tuple(
+                reward if terminal else reward + opt.gamma * torch.max(prediction)
+                for reward, terminal, prediction in zip(reward_batch, terminal_batch, next_prediction_batch)
+            )
+        )
 
         q_value = torch.sum(current_prediction_batch * action_batch, dim=1)
         optimizer.zero_grad()
@@ -113,18 +119,18 @@ def train(opt):
 
         state = next_state
         iter += 1
-        print("Iteration: {}/{}, Action: {}, Loss: {}, Epsilon {}, Reward: {}, Q-value: {}".format(
-            iter + 1,
-            opt.num_iters,
-            action,
-            loss,
-            epsilon, reward, torch.max(prediction)))
-        writer.add_scalar('Train/Loss', loss, iter)
-        writer.add_scalar('Train/Epsilon', epsilon, iter)
-        writer.add_scalar('Train/Reward', reward, iter)
-        writer.add_scalar('Train/Q-value', torch.max(prediction), iter)
-        if (iter+1) % 1000000 == 0:
-            torch.save(model, "{}/flappy_bird_{}".format(opt.saved_path, iter+1))
+        print(
+            "Iteration: {}/{}, Action: {}, Loss: {}, Epsilon {}, Reward: {}, Q-value: {}".format(
+                iter + 1, opt.num_iters, action, loss, epsilon, reward, torch.max(prediction)
+            )
+        )
+        writer.add_scalar("Train/Loss", loss, iter)
+        writer.add_scalar("Train/Epsilon", epsilon, iter)
+        writer.add_scalar("Train/Reward", reward, iter)
+        writer.add_scalar("Train/Q-value", torch.max(prediction), iter)
+        if (iter + 1) % 200000 == 0:
+            os.makedirs(opt.saved_path, exist_ok=True)
+            torch.save(model, "{}/flappy_bird_{}".format(opt.saved_path, iter + 1))
     torch.save(model, "{}/flappy_bird".format(opt.saved_path))
 
 
